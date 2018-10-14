@@ -72,16 +72,21 @@ public class BookingResource {
     }
 
     @PostMapping("/screen/{screenName}/reserve")
-    public ResponseEntity<Object> reserveSeats(@PathVariable String screenName, @RequestBody ReserveSeatDto reserveData) {
-        screenRepository.save(getUpdatedScreen(reserveData, screenName));
+    public ResponseEntity<Object> reserveSeats(@RequestBody ReserveSeatDto reserveData, @PathVariable String screenName) {
+        Screen updatedScreen = getUpdatedScreen(reserveData, screenName);
+
+        if (updatedScreen!=null) {
+            screenRepository.save(updatedScreen);
+        }
         return ResponseEntity.noContent().build();
     }
 
     private Screen getUpdatedScreen(ReserveSeatDto reserveData, String screenName) {
         Screen screenByName = screenRepository.getScreenByName(screenName);
         if (screenByName != null) {
+            List<Row> rowList = new ArrayList<>();
             reserveData.getSeats().forEach((rowName, seats) -> {
-                List<Row> rowList = screenByName.getRows()
+                rowList.addAll(screenByName.getRows()
                         .stream()
                         .filter(r -> r.getRowName().equalsIgnoreCase(rowName))
                         .map(row -> {
@@ -91,9 +96,10 @@ public class BookingResource {
                             }).collect(Collectors.toList());
                             row.setSeats(seatList);
                             return row;
-                        }).collect(Collectors.toList());
-                screenByName.setRows(rowList);
+                        }).collect(Collectors.toList()));
             });
+            screenByName.setRows(rowList);
+
         }
         return screenByName;
     }
