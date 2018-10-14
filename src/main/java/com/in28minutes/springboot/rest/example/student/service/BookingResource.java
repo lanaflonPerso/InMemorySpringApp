@@ -1,28 +1,26 @@
 package com.in28minutes.springboot.rest.example.student.service;
 
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+import static com.in28minutes.springboot.rest.example.student.dto.ReservationResponseDto.Status.SUCCESS;
 
-import com.in28minutes.springboot.rest.example.student.ScreenNotFoundException;
+import java.net.URI;
+import java.util.List;
+import java.util.Optional;
+
+import com.in28minutes.springboot.rest.example.student.NotFoundException;
 import com.in28minutes.springboot.rest.example.student.StudentNotFoundException;
+import com.in28minutes.springboot.rest.example.student.dto.ReservationResponseDto;
+import com.in28minutes.springboot.rest.example.student.dto.ReservationResponseDto.Status;
 import com.in28minutes.springboot.rest.example.student.dto.ReserveSeatDto;
 import com.in28minutes.springboot.rest.example.student.dto.ScreenInfoDto;
-import com.in28minutes.springboot.rest.example.student.dto.ScreenInfoDto.RowInfo;
 import com.in28minutes.springboot.rest.example.student.persistence.Row;
 import com.in28minutes.springboot.rest.example.student.persistence.Screen;
-import com.in28minutes.springboot.rest.example.student.persistence.Seat;
-import com.in28minutes.springboot.rest.example.student.persistence.Seat.Status;
 import com.in28minutes.springboot.rest.example.student.persistence.Student;
 import com.in28minutes.springboot.rest.example.student.repository.RowRepository;
 import com.in28minutes.springboot.rest.example.student.repository.ScreenRepository;
 import com.in28minutes.springboot.rest.example.student.repository.SeatRepository;
 import com.in28minutes.springboot.rest.example.student.repository.StudentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -61,6 +59,11 @@ public class BookingResource {
 		return screenRepository.findAll();
 	}
 
+    @GetMapping("/screen/rows")
+    public List<Row> getAllRows() {
+        return rowRepository.findAll();
+    }
+
 	@GetMapping("/students/{id}")
 	public Student retrieveStudent(@PathVariable long id) {
 		Optional<Student> student = studentRepository.findById(id);
@@ -75,20 +78,28 @@ public class BookingResource {
     public Screen getScreen(@PathVariable String screenName) {
         Screen screenByName = screenRepository.getScreenByName(screenName);
         if (screenByName == null){
-            throw new ScreenNotFoundException(screenName);
+            throw new NotFoundException(screenName);
         }
         return screenByName;
     }
 
     @PostMapping("/screen/{screenName}/reserve")
-    public ResponseEntity<Object> reserveSeats(@RequestBody ReserveSeatDto reserveData, @PathVariable String screenName) {
-        Screen updatedScreen = bookingResourceImpl.getUpdatedScreen(reserveData, screenName);
+    public ResponseEntity<?> reserveSeats(@RequestBody ReserveSeatDto reserveData, @PathVariable String screenName) {
 
-        if (updatedScreen!=null) {
+        Screen screenByName = screenRepository.getScreenByName(screenName);
+        if (screenByName == null){
+            throw new NotFoundException(screenName);
+        }
+        ReservationResponseDto responseDto = new ReservationResponseDto();
+        responseDto.status = SUCCESS;
+        Screen updatedScreen = bookingResourceImpl.getUpdatedScreen(reserveData, screenByName, responseDto);
+
+        if (responseDto.getStatus().equals(SUCCESS)) {
             screenRepository.save(updatedScreen);
+            return new ResponseEntity<>(responseDto, HttpStatus.CREATED);
         }
 
-        return ResponseEntity.noContent().build();
+        return new ResponseEntity<>(responseDto, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     @DeleteMapping("/students/{id}")
